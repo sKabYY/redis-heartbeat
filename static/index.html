@@ -1,0 +1,92 @@
+<html>
+    <head>
+        <title>Redis - Heartbeat</title>
+        <script src="http://code.jquery.com/jquery-3.3.1.min.js"></script>
+        <script src="https://code.highcharts.com/highcharts.js"></script>
+    </head>
+    <body>
+        <h1>Redis - Heartbeat</h1>
+        <h2 id="errmsg" style="color: red"></h2>
+        <div id="chart-memused"></div>
+        <div id="chart-restime"></div>
+        <script>
+            Highcharts.setOptions({
+                global: { useUTC: false }
+            });
+            var getAddrs = (beats) => {
+                var addrs = [];
+                beats.forEach(beat => {
+                    if (beat.data) {
+                        for (var key in beat.data) {
+                            if (addrs.indexOf(key) < 0) {
+                                addrs.push(key);
+                            }
+                        }
+                    }
+                });
+                return addrs;
+            };
+            $.getJSON('/beats', (beats) => {
+                var addrs = getAddrs(beats);
+                if (beats.length === 0) {
+                    $('#errmsg').text('No data.')
+                } else if (addrs.length === 0) {
+                    $('#errmsg').text('No nodes.')
+                }
+                var memusedSeries = addrs.map(addr => {
+                    return {
+                        name: addr,
+                        data: beats.map(beat => {
+                            var y = 0;
+                            if (beat.data) {
+                                y = beat.data[addr] || 0;
+                            }
+                            return [new Date(beat.timestamp), y];
+                        })
+                    };
+                });
+                var restimeSeries = [{
+                    name: 'Exporter Response Time',
+                    data: beats.map(beat => [new Date(beat.timestamp), beat.using_ms])
+                }];
+                Highcharts.chart('chart-memused', {
+                    chart: { zoomType: 'x' },
+                    title: { text: 'Memory Used' },
+                    plotOptions: {
+                        series: {
+                            label: { connectorAllowed: false }
+                        }
+                    },
+                    credits: { enabled: false },
+                    xAxis: {
+                        type: 'datetime'
+                    },
+                    yAxis: {
+                        title: { text: 'Bytes' },
+                        min: 0
+                    },
+                    series: memusedSeries
+                });
+                Highcharts.chart('chart-restime', {
+                    chart: { zoomType: 'x' },
+                    title: { text: 'Response Time' },
+                    plotOptions: {
+                        series: {
+                            label: { connectorAllowed: false }
+                        }
+                    },
+                    legend: { enabled: false },
+                    credits: { enabled: false },
+                    xAxis: {
+                        type: 'datetime'
+                    },
+                    yAxis: {
+                        title: { text: 'milliseconds' },
+                        min: 0
+                    },
+                    series: restimeSeries
+                });
+            });
+        </script>
+    </body>
+</html>
